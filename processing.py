@@ -37,18 +37,15 @@ def app():
             audio = speech.listen(mic_source)
             print("\n== Not listening right now ==\n")
 
-            Result_Text = speech.recognize_vosk(audio_data=audio, language='en')
-            try:
-                Text_to_Json = json.loads(Result_Text)
-            except json.JSONDecodeError as e:
-                print("Nothingggg")
-            Decoded_Message = Text_to_Json['text']
+        Result_Text = speech.recognize_vosk(audio_data=audio, language='en')
+        Text_to_Json = json.loads(Result_Text)
+        Decoded_Message = Text_to_Json['text']
 
-            # Ignore any empty responses
-            if not Decoded_Message:
-                continue
+        # Ignore Empty Responses
+        if not Decoded_Message:
+            continue
 
-            print(f'\n{Decoded_Message}\n') 
+        print(f'\n{Decoded_Message}\n') 
 
         conversation.append(
             {
