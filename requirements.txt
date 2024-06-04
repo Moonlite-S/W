@@ -1,0 +1,7 @@
+SpeechRecognition >=3.10.4
+Ollama >=0.2.0
+PyAudio >= 0.2.14
+setuptools >=70.0.0
+vosk >=0.3.45
+python-vlc >=3.0.20123
+TTS >=0.22.0

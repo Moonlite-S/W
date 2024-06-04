@@ -1,0 +1,9 @@
+.env
+
+__pycache__
+.venv
+.vscode
+
+conversation_logs/*
+model/*
+output/*
