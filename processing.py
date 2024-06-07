@@ -1,81 +1,112 @@
 import ollama
 import speech_recognition as sr
-import json
 import torch
 import vlc
+import whisper
+import os
 from TTS.api import TTS
 
 # TODO:
-# - Set this in another thread so that Flask can do it's job
+# - After the first several responses, process is alot faster. How can I make the process already fast enough?
+# - Sometimes the first couple of words when the audio is processed gets cut off. Fix that.
 
 print("Initializting, Please Wait\n")
 # For TTS (Uses my Nvidia GPU for processing primarily)
-#   [MAYBE CAUSE FOR BLACK SCREENING]
-device = "cuda" if torch.cuda.is_available() else "cpu"
+# [HAS TO USE CUDA / OTHERWISE USING CPU BLACK SCREENS MY PC]
+if torch.cuda.is_available():
+    device = "cuda"
+else:
+    raise Exception("Cuda is not installed and / or not in use. CPU can and WILL crash my PC.")
 
 # Init TTS
-tts = TTS("tts_models/en/jenny/jenny").to(device)
-# Init Speech Recog (VERY FUCKING STUPID)
+tts = TTS("tts_models/en/jenny/jenny",progress_bar=True, gpu=True).to(device)
+# Init Speech Recog 
 speech = sr.Recognizer()
-with sr.Microphone() as mic_source:
-    audio = speech.record(source=mic_source, duration=0.1)
-    Result_Text = speech.recognize_vosk(audio_data=audio, language='en')
+# Init Audio to Text (OpenAI Whisper)
+whisp = whisper.load_model("base")
+
 print("Done Initializing\n")
 
-conversation = [
-    {
-        'role': 'system',
-        'content': "You are W, an AI companion who is both very sarastic to their creator. I am her creator, named Muna. You like to be witty and make fun of me a lot. You don't like saying nice things to Muna. Keep your responses short.",
-    },
-]
+conversation = []
+pause_loop = False # Paused Loop (Maybe stop the thread instead?)
+
+# Main Loop
 def app():
     while(True):
-        # Speech Recognition
-        with sr.Microphone() as mic_source:
-            speech.adjust_for_ambient_noise(mic_source, duration=0.7)
-            print("\n== Listening for Responses ==\n")
-            audio = speech.listen(mic_source)
-            print("\n== Not listening right now ==\n")
 
-        Result_Text = speech.recognize_vosk(audio_data=audio, language='en')
-        Text_to_Json = json.loads(Result_Text)
-        Decoded_Message = Text_to_Json['text']
+        if pause_loop == True:
+            continue
+
+        audio = mic_processing(0)
+
+        Decoded_Message = speech_to_text(audio)
 
         # Ignore Empty Responses
         if not Decoded_Message:
             continue
 
-        print(f'\n{Decoded_Message}\n') 
+        message = ollama_processing(Decoded_Message)
 
-        conversation.append(
-            {
-                'role': 'user',
-                'content': Decoded_Message
-            }
-        )
+        tts_processing(message)
 
-        # Llama3 AI Response
-        print("\n== Responding... ==\n")
-        response = ollama.chat(model='llama3', messages=conversation, stream=True)
-        message = ""
+        audio_autoplay()
 
-        for chunk in response:
-            print(chunk['message']['content'], end='', flush=True)
-            message += chunk['message']['content']
+def mic_processing(mic_source_index: int) -> sr.AudioData:
+        with sr.Microphone(mic_source_index) as mic_source:
+            speech.adjust_for_ambient_noise(mic_source, duration=1)
+            print("\n== Listening for Responses ==\n")
+            audio = speech.listen(mic_source)
+            print("\n== Not listening right now ==\n")
+        
+        return audio
 
-        conversation.append(
-            {
-                'role': 'assistant',
-                'content': message
-            }
-        )
+def speech_to_text(audio: sr.AudioData) -> str:
+    with open("./input/input.wav", "wb") as f:
+        f.write(audio.get_wav_data())
 
-        # # TTS
-        # print("\n== Audio Processing ==\n")
-        # # Run TTS
-        # tts.tts_to_file(text=message, file_path="./output/output.wav")
-        # print("\n== Audio Finished ==\n")
+    result = whisp.transcribe("./input/input.wav")
+    Decoded_Message = result['text']
 
-        # # Autoplay wav file
-        # player = vlc.MediaPlayer("./output/output.wav")
-        # player.play()
+    # Just in case Whisper tries to read the previous response
+    if os.path.exists("./input/input.wav"):
+        os.remove("./input/input.wav")
+    else:
+        print("\n(Nothing to Delete)\n")
+
+    print(f'\n{Decoded_Message}\n') 
+
+    return Decoded_Message
+
+def ollama_processing(Decoded_Message: str) -> str:
+    conversation.append(
+        {
+            'role': 'user',
+            'content': Decoded_Message
+        }
+    )
+
+    print("\n== Responding... ==\n")
+    response = ollama.chat(model='W', messages=conversation, stream=True)
+    message = ""
+
+    for chunk in response:
+        # print(chunk['message']['content'], end='', flush=True)
+        message += chunk['message']['content']
+
+    conversation.append(
+        {
+            'role': 'assistant',
+            'content': message
+        }
+    )
+
+    return message
+
+def tts_processing(message: str):
+    print("\n== Audio Processing ==\n")
+    tts.tts_to_file(text=message, file_path="./output/output.wav")
+    print("\n== Audio Finished ==\n")
+
+def audio_autoplay():
+    player = vlc.MediaPlayer("./output/output.wav")
+    player.play()
