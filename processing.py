@@ -1,3 +1,5 @@
+import json
+from flask_socketio import emit
 import ollama
 import speech_recognition as sr
 import torch
@@ -10,40 +12,51 @@ from TTS.api import TTS
 # - After the first several responses, process is alot faster. How can I make the process already fast enough?
 # - Sometimes the first couple of words when the audio is processed gets cut off. Fix that.
 
-print("Initializting, Please Wait\n")
-# For TTS (Uses my Nvidia GPU for processing primarily)
-# [HAS TO USE CUDA / OTHERWISE USING CPU BLACK SCREENS MY PC]
-if torch.cuda.is_available():
-    device = "cuda"
-else:
-    raise Exception("Cuda is not installed and / or not in use. CPU can and WILL crash my PC.")
-
-# Init TTS
-tts = TTS("tts_models/en/jenny/jenny",progress_bar=True, gpu=True).to(device)
-# Init Speech Recog 
-speech = sr.Recognizer()
-# Init Audio to Text (OpenAI Whisper)
-whisp = whisper.load_model("base")
-
-print("Done Initializing\n")
-
 conversation = []
 pause_loop = False # Paused Loop (Maybe stop the thread instead?)
+tts = None
+speech = None
+whisp = None
+init_finished = False
+
+def init_processing():
+    global tts, speech, whisp, init_finished
+
+    print("Initializting, Please Wait\n")
+    # For TTS (Uses my Nvidia GPU for processing primarily)
+    # [HAS TO USE CUDA / OTHERWISE USING CPU BLACK SCREENS MY PC]
+    if torch.cuda.is_available():
+        device = "cuda"
+    else:
+        raise Exception("Cuda is not installed and / or not in use. CPU can and WILL crash my PC.")
+
+    # Init TTS
+    tts = TTS("tts_models/en/jenny/jenny",progress_bar=True, gpu=True).to(device)
+    # Init Speech Recog 
+    speech = sr.Recognizer()
+    # Init Audio to Text (OpenAI Whisper)
+    whisp = whisper.load_model("base")
+
+    init_finished = True
+    print("Done Initializing\n")
+
 
 # Main Loop
-def app():
-    while(True):
-
-        if pause_loop == True:
-            continue
+def main_loop():
+    while True:
+        if not init_finished:
+            print("Hasn't finished initializing yet")
+            return
 
         audio = mic_processing(0)
 
         Decoded_Message = speech_to_text(audio)
 
+        emit('chat_response', json.dumps({'Decoded_Message': Decoded_Message, 'test': "test"}))
+
         # Ignore Empty Responses
         if not Decoded_Message:
-            continue
+            return
 
         message = ollama_processing(Decoded_Message)
 

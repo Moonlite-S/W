@@ -1,12 +1,43 @@
 import { useState, useEffect } from 'react'
-import { get_convo } from './api/api';
+import { io } from 'socket.io-client';
 
 function App() {
-  const [arrr, setArray] = useState([]); // 0 = W, 1 = Muna
+  const [arrr, setArray] = useState<string[]>([]); // 0 = W, 1 = Muna
   
   useEffect(() => {
-    const interval = setInterval(get_convo, 5000, setArray);
-    return () => clearInterval(interval);
+      const socket = io("http://127.0.0.1:5000");
+
+      socket.on("connect", () => {
+        console.log("connected; turning on chat");
+        socket.emit("server_loop");
+      });
+
+      socket.on("disconnect", (data) => {
+        console.log(data);
+      });
+
+      socket.on("chat_response", (data) => {
+        console.log("Message: " + data);
+        data = JSON.parse(data);
+        console.log("Message (data): " + data + " (" + typeof(data) + ")");
+        
+        const to_array = [data.W, data.Muna];
+        console.log("Message (to_array): " + to_array);
+
+        setArray(to_array);
+      });
+
+      socket.on("error", (data) => {
+        console.log(data);
+      });
+
+      socket.on("reconnect", (attempt) => {
+        console.log(attempt);
+      });
+
+      return function cleanup() {
+        socket.disconnect();
+      };
   }, [])
  
   return (
@@ -27,8 +58,6 @@ function App() {
           arrr[0]
         }
       </div>
-
-      <div className='bg-W w-[50%] h-96 mx-auto bg-cover bg-center my-5'></div>
 
       <div className='py-5'>
         <h3>Muna says:</h3>

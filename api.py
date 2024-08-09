@@ -1,10 +1,15 @@
-from flask import Flask, jsonify
-from flask_cors import CORS
+import json
 from threading import Thread
+from flask import Flask, request
+from flask_cors import CORS
+from flask_socketio import SocketIO, emit
 import processing
 
 app = Flask(__name__)
-cors = CORS(app, origins='*')
+app.config['SECRET_KEY'] = 'secret!'
+cors = CORS(app, resources={r"/*": {"origins": "*"}})
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+thread = None
 
 #@app.route('[command]', methods=['GET / POST / DELETE / UPDATE'])
 #ex: @app.route('/date', methods=['GET'])
@@ -25,20 +30,36 @@ def get_convo():
             w_latest_message = i['content']
             break
 
-    return jsonify({'W': w_latest_message, 'Muna': my_input})
+    data = {"W": w_latest_message, "Muna": my_input}
+    return json.dumps(data)
 
-@app.route('/api/pause', methods=['POST'])
-def post_paused_convo():
-    processing.paused = True
-    return jsonify({'Paused': 'True'})
+@socketio.on('connect')
+def connected(data):
+    print("client has connected")
+        
+@socketio.on("disconnect")
+def disconnected(d):
+    global thread
+    print("user disconnected")
 
-@app.route('/api/resume', methods=['POST'])
-def post_resumed_convo():
-    processing.paused = False
-    return jsonify({'Paused': 'False'})
+    if thread is not None:
+        print("stopping background thread")
+        thread.join(10.0)
+        print(thread.is_alive())
+        #thread = None
+
+@socketio.on('server_loop')
+def main_loop():
+    global thread
+    if thread is None:
+        print("starting background thread")
+        thread = socketio.start_background_task(processing.main_loop())
+        thread.start()
+
+def main():
+    processing.init_processing()
+    print("Server starting")
+    socketio.run(app, host='127.0.0.1', port=5000)
 
 if __name__ == '__main__':
-    print("Thread starting")
-    thread = Thread(target = processing.app, name="Processing")
-    thread.start()
-    app.run(port=5000)
+    main()
