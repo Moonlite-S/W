@@ -1,5 +1,5 @@
-import json
 from flask_socketio import emit
+import json
 import ollama
 import speech_recognition as sr
 import torch
@@ -12,14 +12,18 @@ from TTS.api import TTS
 # - After the first several responses, process is alot faster. How can I make the process already fast enough?
 # - Sometimes the first couple of words when the audio is processed gets cut off. Fix that.
 
-conversation = []
-pause_loop = False # Paused Loop (Maybe stop the thread instead?)
-tts = None
-speech = None
-whisp = None
-init_finished = False
-
+conversation: list = []
+pause_loop: bool = False # Paused Loop (Maybe stop the thread instead?)
+tts: TTS = None
+speech: sr.Recognizer = None
+whisp: whisper.Whisper = None
+init_finished: bool = False
+        
 def init_processing():
+    ''' Initializing the TTS, Speech Recog, and OpenAI Whisper. 
+    
+    THIS MUST BE CALLED BEFORE USING THE MAIN LOOP.'''
+
     global tts, speech, whisp, init_finished
 
     print("Initializting, Please Wait\n")
@@ -40,29 +44,29 @@ def init_processing():
     init_finished = True
     print("Done Initializing\n")
 
-
 # Main Loop
 def main_loop():
-    while True:
-        if not init_finished:
-            print("Hasn't finished initializing yet")
-            return
 
-        audio = mic_processing(0)
+    if not init_finished:
+        raise Exception("Hasn't finished initializing yet. This was not expected. (main_loop)")
 
-        Decoded_Message = speech_to_text(audio)
+    audio = mic_processing(0) # 0 is the default microphone
 
-        emit('chat_response', json.dumps({'Decoded_Message': Decoded_Message, 'test': "test"}))
+    Decoded_Message = speech_to_text(audio)
 
-        # Ignore Empty Responses
-        if not Decoded_Message:
-            return
+    # Ignore Empty Responses
+    if not Decoded_Message:
+        return
 
-        message = ollama_processing(Decoded_Message)
+    message = ollama_processing(Decoded_Message)
 
-        tts_processing(message)
+    tts_processing(message)
 
-        audio_autoplay()
+    audio_autoplay()
+
+'''
+    Helper Functions
+'''
 
 def mic_processing(mic_source_index: int) -> sr.AudioData:
         with sr.Microphone(mic_source_index) as mic_source:
@@ -98,6 +102,8 @@ def ollama_processing(Decoded_Message: str) -> str:
         }
     )
 
+    emit('chat_response', get_convo()) # Send User Input
+
     print("\n== Responding... ==\n")
     response = ollama.chat(model='W', messages=conversation, stream=True)
     message = ""
@@ -113,13 +119,34 @@ def ollama_processing(Decoded_Message: str) -> str:
         }
     )
 
+    emit('chat_response', get_convo()) # Send Ollama Response
+
     return message
 
-def tts_processing(message: str):
+def tts_processing(message: str) -> None:
     print("\n== Audio Processing ==\n")
     tts.tts_to_file(text=message, file_path="./output/output.wav")
     print("\n== Audio Finished ==\n")
 
-def audio_autoplay():
+def audio_autoplay() -> None:
     player = vlc.MediaPlayer("./output/output.wav")
     player.play()
+
+def get_convo() -> str:
+    global conversation
+
+    my_input: str = " "
+    w_latest_message: str = " "
+
+    for i in reversed(conversation):
+        if i['role'] == 'user':
+            my_input = i['content']
+            break
+
+    for i in reversed(conversation):
+        if i['role'] == 'assistant':
+            w_latest_message = i['content']
+            break
+
+    data: dict = {"W": w_latest_message, "Muna": my_input}
+    return json.dumps(data)

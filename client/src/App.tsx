@@ -12,15 +12,12 @@ function App() {
         socket.emit("server_loop");
       });
 
-      socket.on("disconnect", (data) => {
-        console.log(data);
+      socket.on("disconnect", () => {
+        console.log("disconnected");
       });
 
       socket.on("chat_response", (data) => {
-        console.log("Message: " + data);
         data = JSON.parse(data);
-        console.log("Message (data): " + data + " (" + typeof(data) + ")");
-        
         const to_array = [data.W, data.Muna];
         console.log("Message (to_array): " + to_array);
 
