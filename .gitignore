@@ -32,3 +32,5 @@ conversation_logs/*
 model/*
 output/output.wav
 input/input.wav
+
+start_dev.bat
