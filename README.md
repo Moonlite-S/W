@@ -20,6 +20,7 @@ I use an edited version of Llama3, using the 'W-model' model file. Make sure it'
 - (8/10/2024)
 
 > Web app should show messages quicker
+>
 > Some refactoring (okay a lot was made)
 
 - (6/7/2024)

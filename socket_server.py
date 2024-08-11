@@ -1,6 +1,6 @@
 from flask import Flask, copy_current_request_context
 from flask_cors import CORS
-from flask_socketio import SocketIO
+from flask_socketio import SocketIO, emit
 import backend
 
 # TODO:
@@ -18,6 +18,7 @@ thread = None
 @socketio.on('connect')
 def connected():
     print("Client has connected")
+    emit('chat_response', backend.get_convo())
         
 @socketio.on("disconnect")
 def disconnected():
@@ -29,9 +30,13 @@ def disconnected():
         thread_stop = True
         thread.join()
         
-        print(thread.is_alive())
+        while thread.is_alive():
+            print(thread.is_alive())
+            continue
+
         thread = None
 
+@app.route('/server')
 @socketio.on('server_loop')
 def server_loop():
     global thread, thread_stop

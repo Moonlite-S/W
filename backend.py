@@ -135,8 +135,8 @@ def audio_autoplay() -> None:
 def get_convo() -> str:
     global conversation
 
-    my_input: str = " "
-    w_latest_message: str = " "
+    my_input: str = ""
+    w_latest_message: str = ""
 
     for i in reversed(conversation):
         if i['role'] == 'user':
