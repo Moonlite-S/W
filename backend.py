@@ -35,7 +35,7 @@ def init_processing():
         raise Exception("Cuda is not installed and / or not in use. CPU can and WILL crash my PC.")
 
     # Init TTS
-    tts = TTS("tts_models/en/jenny/jenny",progress_bar=True, gpu=True).to(device)
+    tts = TTS("tts_models/en/jenny/jenny").to(device)
     # Init Speech Recog 
     speech = sr.Recognizer()
     # Init Audio to Text (OpenAI Whisper)
